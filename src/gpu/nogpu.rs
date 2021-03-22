@@ -15,7 +15,7 @@ impl<E> FFTKernel<E>
 where
     E: ScalarEngine,
 {
-    pub fn create(_: bool) -> GPUResult<FFTKernel<E>> {
+    pub fn create(_: bool, __: Option<u32>) -> GPUResult<FFTKernel<E>> {
         return Err(GPUError::GPUDisabled);
     }
 
@@ -32,7 +32,7 @@ impl<E> MultiexpKernel<E>
 where
     E: ScalarEngine,
 {
-    pub fn create(_: bool) -> GPUResult<MultiexpKernel<E>> {
+    pub fn create(_: bool, _: Option<Vec<u32>>) -> GPUResult<MultiexpKernel<E>> {
         return Err(GPUError::GPUDisabled);
     }
 
@@ -54,14 +54,14 @@ where
 use crate::bls::Engine;
 
 macro_rules! locked_kernel {
-    ($class:ident) => {
+    ($class:ident, $dev:ty) => {
         pub struct $class<E>(PhantomData<E>);
 
         impl<E> $class<E>
         where
             E: Engine,
         {
-            pub fn new(_: usize, _: bool) -> $class<E> {
+            pub fn new(_: usize, _: bool, _: Option<$dev>) -> $class<E> {
                 $class::<E>(PhantomData)
             }
 
@@ -75,5 +75,5 @@ macro_rules! locked_kernel {
     };
 }
 
-locked_kernel!(LockedFFTKernel);
-locked_kernel!(LockedMultiexpKernel);
+locked_kernel!(LockedFFTKernel, u32);
+locked_kernel!(LockedMultiexpKernel, Vec<u32>);

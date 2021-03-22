@@ -214,32 +214,50 @@ where
     E: Engine,
 {
     kernels: Vec<SingleMultiexpKernel<E>>,
-    _lock: locks::GPULock, // RFC 1857: struct fields are dropped in the same order as they are declared.
+    //_lock: locks::GPULock, // RFC 1857: struct fields are dropped in the same order as they are declared.
 }
 
 impl<E> MultiexpKernel<E>
 where
     E: Engine,
 {
-    pub fn create(priority: bool) -> GPUResult<MultiexpKernel<E>> {
-        let lock = locks::GPULock::lock();
+    pub fn create(priority: bool, device_ids: Option<Vec<u32>>) -> GPUResult<MultiexpKernel<E>> {
+        //let lock = locks::GPULock::lock();
 
         let devices = opencl::Device::all();
 
-        let kernels: Vec<_> = devices
-            .into_iter()
-            .map(|d| (d, SingleMultiexpKernel::<E>::create(d.clone(), priority)))
-            .filter_map(|(device, res)| {
-                if let Err(ref e) = res {
-                    error!(
-                        "Cannot initialize kernel for device '{}'! Error: {}",
-                        device.name(),
-                        e
-                    );
-                }
-                res.ok()
-            })
-            .collect();
+        let kernels: Vec<_> = if let Some(ids) = device_ids {
+            devices
+                .into_iter()
+                .filter(|d| ids.iter().any(|id| d.bus_id() == Some(*id)))
+                .map(|d| (d, SingleMultiexpKernel::<E>::create(d.clone(), priority)))
+                .filter_map(|(device, res)| {
+                    if let Err(ref e) = res {
+                        error!(
+                            "Cannot initialize kernel for device '{}'! Error: {}",
+                            device.name(),
+                            e
+                        );
+                    }
+                    res.ok()
+                })
+                .collect()
+        } else {
+            devices
+                .into_iter()
+                .map(|d| (d, SingleMultiexpKernel::<E>::create(d.clone(), priority)))
+                .filter_map(|(device, res)| {
+                    if let Err(ref e) = res {
+                        error!(
+                            "Cannot initialize kernel for device '{}'! Error: {}",
+                            device.name(),
+                            e
+                        );
+                    }
+                    res.ok()
+                })
+                .collect()
+        };
 
         if kernels.is_empty() {
             return Err(GPUError::Simple("No working GPUs found!"));
@@ -259,7 +277,7 @@ where
         }
         Ok(MultiexpKernel::<E> {
             kernels,
-            _lock: lock,
+            //_lock: lock,
         })
     }
 

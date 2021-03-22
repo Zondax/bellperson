@@ -11,6 +11,7 @@ mod mapped_params;
 mod params;
 mod proof;
 mod prover;
+mod prover_ext;
 mod verifier;
 mod verifying_key;
 

@@ -392,11 +392,15 @@ fn test_with_bls12() {
     assert_eq!(naive, fast);
 }
 
-pub fn create_multiexp_kernel<E>(_log_d: usize, priority: bool) -> Option<gpu::MultiexpKernel<E>>
+pub fn create_multiexp_kernel<E>(
+    _log_d: usize,
+    priority: bool,
+    device_ids: Option<Vec<u32>>,
+) -> Option<gpu::MultiexpKernel<E>>
 where
     E: crate::bls::Engine,
 {
-    match gpu::MultiexpKernel::<E>::create(priority) {
+    match gpu::MultiexpKernel::<E>::create(priority, device_ids) {
         Ok(k) => {
             info!("GPU Multiexp kernel instantiated!");
             Some(k)

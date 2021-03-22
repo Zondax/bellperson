@@ -27,7 +27,7 @@ impl<E> FFTKernel<E>
 where
     E: Engine,
 {
-    pub fn create(priority: bool) -> GPUResult<FFTKernel<E>> {
+    pub fn create(priority: bool, device_id: Option<u32>) -> GPUResult<FFTKernel<E>> {
         let lock = locks::GPULock::lock();
 
         let devices = opencl::Device::all();
@@ -35,8 +35,17 @@ where
             return Err(GPUError::Simple("No working GPUs found!"));
         }
 
-        // Select the first device for FFT
-        let device = devices[0].clone();
+        let device = if let Some(id) = device_id {
+            devices
+                .into_iter()
+                .find(|dev| dev.bus_id() == device_id)
+                .map(|d| d.clone())
+                .ok_or(GPUError::Simple("No working GPUs found!"))?
+        //dev.clone()
+        } else {
+            // Select the first device for FFT
+            devices[0].clone()
+        };
 
         let src = sources::kernel::<E>(device.brand() == opencl::Brand::Nvidia);
 

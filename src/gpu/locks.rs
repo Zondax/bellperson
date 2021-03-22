@@ -83,7 +83,7 @@ use crate::domain::create_fft_kernel;
 use crate::multiexp::create_multiexp_kernel;
 
 macro_rules! locked_kernel {
-    ($class:ident, $kern:ident, $func:ident, $name:expr) => {
+    ($class:ident, $kern:ident, $func:ident, $name:expr, $dev:ty) => {
         pub struct $class<E>
         where
             E: Engine,
@@ -91,25 +91,27 @@ macro_rules! locked_kernel {
             log_d: usize,
             priority: bool,
             kernel: Option<$kern<E>>,
+            devices: Option<$dev>,
         }
 
         impl<E> $class<E>
         where
             E: Engine,
         {
-            pub fn new(log_d: usize, priority: bool) -> $class<E> {
+            pub fn new(log_d: usize, priority: bool, devices: Option<$dev>) -> $class<E> {
                 $class::<E> {
                     log_d,
                     priority,
                     kernel: None,
+                    devices,
                 }
             }
 
             fn init(&mut self) {
                 if self.kernel.is_none() {
-                    PriorityLock::wait(self.priority);
-                    info!("GPU is available for {}!", $name);
-                    self.kernel = $func::<E>(self.log_d, self.priority);
+                    //PriorityLock::wait(self.priority);
+                    //info!("GPU is available for {}!", $name);
+                    self.kernel = $func::<E>(self.log_d, self.priority, self.devices);
                 }
             }
 
@@ -154,10 +156,11 @@ macro_rules! locked_kernel {
     };
 }
 
-locked_kernel!(LockedFFTKernel, FFTKernel, create_fft_kernel, "FFT");
+locked_kernel!(LockedFFTKernel, FFTKernel, create_fft_kernel, "FFT", u32);
 locked_kernel!(
     LockedMultiexpKernel,
     MultiexpKernel,
     create_multiexp_kernel,
-    "Multiexp"
+    "Multiexp",
+    Vec<u32>
 );
