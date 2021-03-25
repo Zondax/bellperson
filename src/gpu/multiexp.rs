@@ -1,5 +1,5 @@
 use super::error::{GPUError, GPUResult};
-use super::locks;
+//use super::locks;
 use super::sources;
 use super::utils;
 use crate::bls::Engine;
@@ -42,7 +42,7 @@ where
     core_count: usize,
     n: usize,
 
-    priority: bool,
+    _priority: bool, // TODO: Remove this -> it might become another thing more useful
     _phantom: std::marker::PhantomData<E::Fr>,
 }
 
@@ -115,7 +115,7 @@ where
             program: opencl::Program::from_opencl(d, &src)?,
             core_count,
             n,
-            priority,
+            _priority: priority,
             _phantom: std::marker::PhantomData,
         })
     }
@@ -129,10 +129,6 @@ where
     where
         G: CurveAffine,
     {
-        if locks::PriorityLock::should_break(self.priority) {
-            return Err(GPUError::GPUTaken);
-        }
-
         let exp_bits = exp_size::<E>() * 8;
         let window_size = calc_window_size(n as usize, exp_bits, self.core_count);
         let num_windows = ((exp_bits as f64) / (window_size as f64)).ceil() as usize;
@@ -222,8 +218,6 @@ where
     E: Engine,
 {
     pub fn create(priority: bool, device_ids: Option<Vec<u32>>) -> GPUResult<MultiexpKernel<E>> {
-        //let lock = locks::GPULock::lock();
-
         let devices = opencl::Device::all();
 
         let kernels: Vec<_> = if let Some(ids) = device_ids {

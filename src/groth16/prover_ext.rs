@@ -7,11 +7,12 @@ use crate::gpu::{LockedFFTKernel, LockedMultiexpKernel};
 use crate::SynthesisError;
 
 use scheduler_client::{
-    register, schedule_one_of, Deadline, ResourceAlloc, ResourceMemory, ResourceReq, ResourceType,
-    TaskFunc, TaskReqBuilder, TaskResult,
+    register, schedule_one_of,
+    ResourceAlloc, /*Deadline, ResourceMemory, ResourceReq, ResourceType,*/
+    TaskFunc, /*TaskReqBuilder, */ TaskRequirements, TaskResult,
 };
 
-pub(crate) struct FftSolver<E, F, R>
+pub struct FftSolver<E, F, R>
 where
     for<'a> F:
         FnMut(usize, &'a mut Option<LockedFFTKernel<E>>) -> Option<Result<R, SynthesisError>>,
@@ -44,39 +45,17 @@ where
         }
     }
 
-    pub fn solve(&mut self) -> Result<(), Box<dyn Error>> {
-        // get the scheduler client
-        let client = match register(std::process::id() as _, std::process::id() as _) {
+    pub fn solve(&mut self, task_req: Option<TaskRequirements>) -> Result<(), Box<dyn Error>> {
+        use rand::Rng;
+
+        let mut rng = rand::thread_rng();
+        let id = rng.gen::<u32>();
+        let client = match register(id, id as _) {
             Ok(c) => c,
             Err(e) => return Err(e.into()),
         };
 
-        let requirements = if cfg!(feature = "gpu") {
-            let start = chrono::Utc::now();
-            let end = start + chrono::Duration::seconds(30);
-            let deadline = Deadline::new(start, end);
-
-            match TaskReqBuilder::new()
-                .resource_req(ResourceReq {
-                    resource: ResourceType::Gpu(ResourceMemory::Mem(2)),
-                    quantity: 1,
-                    preemptible: true,
-                })
-                .with_time_estimations(
-                    Duration::from_millis(500),
-                    self.num_iter,
-                    Duration::from_millis(3000),
-                )
-                .with_deadline(deadline)
-                .build()
-            {
-                Ok(req) => Some(req),
-                Err(e) => return Err(e.into()),
-            }
-        } else {
-            None
-        };
-        schedule_one_of(client, self, requirements, Duration::from_secs(10)).map_err(|e| e.into())
+        schedule_one_of(client, self, task_req, Duration::from_secs(90)).map_err(|e| e.into())
     }
 }
 
@@ -114,7 +93,7 @@ where
     }
 }
 
-pub(crate) struct MultiexpSolver<E, F, R>
+pub struct MultiexpSolver<E, F, R>
 where
     for<'a> F:
         FnMut(usize, &'a mut Option<LockedMultiexpKernel<E>>) -> Option<Result<R, SynthesisError>>,
@@ -147,39 +126,17 @@ where
         }
     }
 
-    pub fn solve(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn solve(&mut self, task_req: Option<TaskRequirements>) -> Result<(), Box<dyn Error>> {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
         // get the scheduler client
-        let client = match register(std::process::id() as _, std::process::id() as _) {
+        let id = rng.gen::<u32>();
+        let client = match register(id, id as _) {
             Ok(c) => c,
             Err(e) => return Err(e.into()),
         };
 
-        let requirements = if cfg!(feature = "gpu") {
-            let start = chrono::Utc::now();
-            let end = start + chrono::Duration::seconds(30);
-            let deadline = Deadline::new(start, end);
-
-            match TaskReqBuilder::new()
-                .resource_req(ResourceReq {
-                    resource: ResourceType::Gpu(ResourceMemory::Mem(2)),
-                    quantity: 1,
-                    preemptible: true,
-                })
-                .with_time_estimations(
-                    Duration::from_millis(500),
-                    self.num_iter,
-                    Duration::from_millis(3000),
-                )
-                .with_deadline(deadline)
-                .build()
-            {
-                Ok(req) => Some(req),
-                Err(e) => return Err(e.into()),
-            }
-        } else {
-            None
-        };
-        schedule_one_of(client, self, requirements, Duration::from_secs(10)).map_err(|e| e.into())
+        schedule_one_of(client, self, task_req, Duration::from_secs(90)).map_err(|e| e.into())
     }
 }
 

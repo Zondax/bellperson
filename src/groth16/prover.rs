@@ -1,16 +1,11 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::bls::Engine;
 use ff::{Field, PrimeField};
 use groupy::{CurveAffine, CurveProjective};
 use rand_core::RngCore;
 use rayon::prelude::*;
-
-#[cfg(feature = "gpu")]
-use super::prover_ext;
-#[cfg(feature = "gpu")]
-use scheduler_client::{register, schedule_one_of, Task, TaskFunc, TaskResult};
 
 use super::{ParameterSource, Proof};
 use crate::domain::{EvaluationDomain, Scalar};
@@ -20,12 +15,20 @@ use crate::multiexp::{multiexp, DensityTracker, FullDensity};
 use crate::{
     Circuit, ConstraintSystem, Index, LinearCombination, SynthesisError, Variable, BELLMAN_VERSION,
 };
+#[cfg(feature = "gpu")]
+use chrono;
+
 use log::info;
 #[cfg(feature = "gpu")]
 use log::trace;
+use scheduler_client::{
+    list_all_resources, Deadline, ResourceMemory, ResourceReq, ResourceType, TaskReqBuilder,
+};
 
 #[cfg(feature = "gpu")]
 use crate::gpu::PriorityLock;
+
+use super::{FftSolver, MultiexpSolver};
 
 type Repr<E> = Arc<Vec<<<E as ff::ScalarEngine>::Fr as ff::PrimeField>::Repr>>;
 type InputsResult<E> = (
@@ -317,10 +320,47 @@ where
         log_d += 1;
     }
 
-    #[cfg(feature = "gpu")]
-    let prio_lock = if priority {
-        trace!("acquiring priority lock");
-        Some(PriorityLock::lock())
+    let requirements = if cfg!(feature = "gpu") {
+        use std::collections::HashMap;
+
+        let start = chrono::Utc::now();
+
+        let deadline = if priority {
+            let end = start;
+            Some(Deadline::new(start, end))
+        } else {
+            None
+        };
+        let mut resources = HashMap::new();
+        list_all_resources()
+            .unwrap()
+            .into_iter()
+            .for_each(|(_, memory)| {
+                if resources.contains_key(&memory) {
+                    *resources.get_mut(&memory).unwrap() += 1;
+                } else {
+                    resources.insert(memory, 1);
+                }
+            });
+        let resource_req = resources
+            .into_iter()
+            .map(|(memory, quantity)| ResourceReq {
+                resource: ResourceType::Gpu(ResourceMemory::Mem(memory)),
+                quantity,
+                preemptible: true,
+            })
+            .collect::<Vec<_>>();
+        let mut task_req = TaskReqBuilder::new()
+            .with_time_estimations(Duration::from_millis(500), 0, Duration::from_millis(3000))
+            .with_deadline(deadline);
+        for req in resource_req.into_iter() {
+            task_req = task_req.resource_req(req);
+        }
+        Some(
+            task_req
+                .build()
+                .expect("Invalid taskRequirements construct"),
+        )
     } else {
         None
     };
@@ -365,10 +405,9 @@ where
             .next()
     };
 
-    let mut as_solver =
-        crate::groth16::prover_ext::FftSolver::new(log_d, priority, provers_len, as_call);
+    let mut as_solver = FftSolver::new(log_d, priority, provers_len, as_call);
     as_solver
-        .solve()
+        .solve(requirements.clone())
         .map_err(|e| SynthesisError::Other(e.to_string()))?;
     let a_s = as_solver.accumulator;
 
@@ -396,10 +435,9 @@ where
             .next()
     };
 
-    let mut hs_solver =
-        crate::groth16::prover_ext::MultiexpSolver::new(log_d, priority, a_s.len(), hs_call);
+    let mut hs_solver = MultiexpSolver::new(log_d, priority, a_s.len(), hs_call);
     hs_solver
-        .solve()
+        .solve(requirements.clone())
         .map_err(|e| SynthesisError::Other(e.to_string()))?;
     let h_s = hs_solver.accumulator;
 
@@ -428,15 +466,10 @@ where
             .next()
     };
 
-    let mut ls_solver = crate::groth16::prover_ext::MultiexpSolver::new(
-        log_d,
-        priority,
-        aux_assignments.len(),
-        ls_call,
-    );
+    let mut ls_solver = MultiexpSolver::new(log_d, priority, aux_assignments.len(), ls_call);
 
     ls_solver
-        .solve()
+        .solve(requirements.clone())
         .map_err(|e| SynthesisError::Other(e.to_string()))?;
 
     let l_s = ls_solver.accumulator;
@@ -526,15 +559,10 @@ where
             .next()
     };
 
-    let mut inputs_solver = crate::groth16::prover_ext::MultiexpSolver::new(
-        log_d,
-        priority,
-        provers.len(),
-        inputs_call,
-    );
+    let mut inputs_solver = MultiexpSolver::new(log_d, priority, provers.len(), inputs_call);
 
     inputs_solver
-        .solve()
+        .solve(requirements)
         .map_err(|e| SynthesisError::Other(e.to_string()))?;
 
     let inputs = inputs_solver.accumulator;
@@ -595,11 +623,11 @@ where
         )
         .collect::<Result<Vec<_>, SynthesisError>>()?;
 
-    #[cfg(feature = "gpu")]
-    {
-        trace!("dropping priority lock");
-        drop(prio_lock);
-    }
+    //#[cfg(feature = "gpu")]
+    //{
+    //trace!("dropping priority lock");
+    //drop(prio_lock);
+    //}
 
     let proof_time = start.elapsed();
     info!("prover time: {:?}", proof_time);

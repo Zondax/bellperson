@@ -42,7 +42,7 @@ scheduler_client = {package = "client", path = "../filecoin-scheduling/client"}
 rust-gpu-tools = { version = "0.3.0", optional = true }
 ff-cl-gen = { version = "0.2.0", optional = true }
 fs2 = { version = "0.4.3", optional = true }
-chrono = "0.4.19"
+chrono = { version = "0.4.19"}
 
 [dev-dependencies]
 hex-literal = "0.3"

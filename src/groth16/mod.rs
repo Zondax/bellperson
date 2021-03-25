@@ -23,5 +23,6 @@ pub use self::mapped_params::*;
 pub use self::params::*;
 pub use self::proof::*;
 pub use self::prover::*;
+pub use self::prover_ext::*;
 pub use self::verifier::*;
 pub use self::verifying_key::*;
