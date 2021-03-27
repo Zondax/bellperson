@@ -217,13 +217,13 @@ impl<E> MultiexpKernel<E>
 where
     E: Engine,
 {
-    pub fn create(priority: bool, device_ids: Option<Vec<u32>>) -> GPUResult<MultiexpKernel<E>> {
+    pub fn create(priority: bool, device_ids: Option<Vec<usize>>) -> GPUResult<MultiexpKernel<E>> {
         let devices = opencl::Device::all();
 
         let kernels: Vec<_> = if let Some(ids) = device_ids {
             devices
                 .into_iter()
-                .filter(|d| ids.iter().any(|id| d.bus_id() == Some(*id)))
+                .filter(|d| ids.iter().any(|id| d.cl_device_id() as usize == *id))
                 .map(|d| (d, SingleMultiexpKernel::<E>::create(d.clone(), priority)))
                 .filter_map(|(device, res)| {
                     if let Err(ref e) = res {

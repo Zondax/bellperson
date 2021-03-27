@@ -25,9 +25,6 @@ use scheduler_client::{
     list_all_resources, Deadline, ResourceMemory, ResourceReq, ResourceType, TaskReqBuilder,
 };
 
-#[cfg(feature = "gpu")]
-use crate::gpu::PriorityLock;
-
 use super::{FftSolver, MultiexpSolver};
 
 type Repr<E> = Arc<Vec<<<E as ff::ScalarEngine>::Fr as ff::PrimeField>::Repr>>;
@@ -356,11 +353,7 @@ where
         for req in resource_req.into_iter() {
             task_req = task_req.resource_req(req);
         }
-        Some(
-            task_req
-                .build()
-                .expect("Invalid taskRequirements construct"),
-        )
+        Some(task_req.build())
     } else {
         None
     };

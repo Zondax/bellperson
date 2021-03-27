@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::time::Duration;
 
 use crate::bls::Engine;
@@ -45,7 +44,7 @@ where
         }
     }
 
-    pub fn solve(&mut self, task_req: Option<TaskRequirements>) -> Result<(), Box<dyn Error>> {
+    pub fn solve(&mut self, mut task_req: Option<TaskRequirements>) -> Result<(), SynthesisError> {
         use rand::Rng;
 
         let mut rng = rand::thread_rng();
@@ -54,6 +53,13 @@ where
             Ok(c) => c,
             Err(e) => return Err(e.into()),
         };
+        if let Some(ref mut req) = task_req {
+            if self.num_iter == 1 {
+                for resource_req in req.req.iter_mut() {
+                    resource_req.preemptible = false;
+                }
+            }
+        }
 
         schedule_one_of(client, self, task_req, Duration::from_secs(90)).map_err(|e| e.into())
     }
@@ -65,9 +71,10 @@ where
         FnMut(usize, &'a mut Option<LockedFFTKernel<E>>) -> Option<Result<R, SynthesisError>>,
     E: Engine,
 {
-    type TaskOutput = ();
+    type Output = ();
+    type Error = SynthesisError;
 
-    fn init(&mut self, alloc: Option<&ResourceAlloc>) -> Result<(), Box<dyn Error>> {
+    fn init(&mut self, alloc: Option<&ResourceAlloc>) -> Result<Self::Output, Self::Error> {
         // Get the resource and create the LockedFFTKernel object
         self.fft_kern.replace(LockedFFTKernel::<E>::new(
             self.log_d,
@@ -76,14 +83,14 @@ where
         ));
         Ok(())
     }
-    fn end(&mut self, _: Option<&ResourceAlloc>) -> Result<Self::TaskOutput, Box<dyn Error>> {
+    fn end(&mut self, _: Option<&ResourceAlloc>) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
-    fn task(&mut self, _alloc: Option<&ResourceAlloc>) -> Result<TaskResult, Box<dyn Error>> {
+    fn task(&mut self, _alloc: Option<&ResourceAlloc>) -> Result<TaskResult, Self::Error> {
         if let Some(res) = (self.call)(self.index, &mut self.fft_kern) {
             match res {
                 Ok(waiter) => self.accumulator.push(waiter),
-                Err(e) => return Err(Box::new(e)),
+                Err(e) => return Err(e),
             }
             self.index += 1;
             Ok(TaskResult::Continue)
@@ -126,7 +133,7 @@ where
         }
     }
 
-    pub fn solve(&mut self, task_req: Option<TaskRequirements>) -> Result<(), Box<dyn Error>> {
+    pub fn solve(&mut self, mut task_req: Option<TaskRequirements>) -> Result<(), SynthesisError> {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         // get the scheduler client
@@ -135,6 +142,14 @@ where
             Ok(c) => c,
             Err(e) => return Err(e.into()),
         };
+
+        if let Some(ref mut req) = task_req {
+            if self.num_iter == 1 {
+                for resource_req in req.req.iter_mut() {
+                    resource_req.preemptible = false;
+                }
+            }
+        }
 
         schedule_one_of(client, self, task_req, Duration::from_secs(90)).map_err(|e| e.into())
     }
@@ -146,9 +161,10 @@ where
         FnMut(usize, &'a mut Option<LockedMultiexpKernel<E>>) -> Option<Result<R, SynthesisError>>,
     E: Engine,
 {
-    type TaskOutput = ();
+    type Output = ();
+    type Error = SynthesisError;
 
-    fn init(&mut self, alloc: Option<&ResourceAlloc>) -> Result<(), Box<dyn Error>> {
+    fn init(&mut self, alloc: Option<&ResourceAlloc>) -> Result<Self::Output, Self::Error> {
         // Get the resource and create the LockedFFTKernel object
         self.multiexp_kern.replace(LockedMultiexpKernel::<E>::new(
             self.log_d,
@@ -157,14 +173,14 @@ where
         ));
         Ok(())
     }
-    fn end(&mut self, _: Option<&ResourceAlloc>) -> Result<Self::TaskOutput, Box<dyn Error>> {
+    fn end(&mut self, _: Option<&ResourceAlloc>) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
-    fn task(&mut self, _alloc: Option<&ResourceAlloc>) -> Result<TaskResult, Box<dyn Error>> {
+    fn task(&mut self, _alloc: Option<&ResourceAlloc>) -> Result<TaskResult, Self::Error> {
         if let Some(res) = (self.call)(self.index, &mut self.multiexp_kern) {
             match res {
                 Ok(waiter) => self.accumulator.push(waiter),
-                Err(e) => return Err(Box::new(e)),
+                Err(e) => return Err(e),
             }
             self.index += 1;
             Ok(TaskResult::Continue)

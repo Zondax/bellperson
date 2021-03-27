@@ -562,7 +562,7 @@ fn parallel_fft_consistency() {
 pub fn create_fft_kernel<E>(
     _log_d: usize,
     priority: bool,
-    device_id: Option<u32>,
+    device_id: Option<usize>,
 ) -> Option<gpu::FFTKernel<E>>
 where
     E: Engine,

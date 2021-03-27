@@ -26,16 +26,16 @@ impl<E> FFTKernel<E>
 where
     E: Engine,
 {
-    pub fn create(priority: bool, device_id: Option<u32>) -> GPUResult<FFTKernel<E>> {
+    pub fn create(priority: bool, device_id: Option<usize>) -> GPUResult<FFTKernel<E>> {
         let devices = opencl::Device::all();
         if devices.is_empty() {
             return Err(GPUError::Simple("No working GPUs found!"));
         }
 
-        let device = if let Some(_id) = device_id {
+        let device = if let Some(id) = device_id {
             devices
                 .into_iter()
-                .find(|dev| dev.bus_id() == device_id)
+                .find(|dev| dev.cl_device_id() as usize == id)
                 .map(|d| d.clone())
                 .ok_or(GPUError::Simple("No working GPUs found!"))?
         } else {

@@ -395,7 +395,7 @@ fn test_with_bls12() {
 pub fn create_multiexp_kernel<E>(
     _log_d: usize,
     priority: bool,
-    device_ids: Option<Vec<u32>>,
+    device_ids: Option<Vec<usize>>,
 ) -> Option<gpu::MultiexpKernel<E>>
 where
     E: crate::bls::Engine,

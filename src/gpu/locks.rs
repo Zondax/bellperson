@@ -156,11 +156,11 @@ macro_rules! locked_kernel {
     };
 }
 
-locked_kernel!(LockedFFTKernel, FFTKernel, create_fft_kernel, "FFT", u32);
+locked_kernel!(LockedFFTKernel, FFTKernel, create_fft_kernel, "FFT", usize);
 locked_kernel!(
     LockedMultiexpKernel,
     MultiexpKernel,
     create_multiexp_kernel,
     "Multiexp",
-    Vec<u32>
+    Vec<usize>
 );
