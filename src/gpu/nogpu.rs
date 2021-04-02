@@ -15,8 +15,8 @@ impl<E> FFTKernel<E>
 where
     E: ScalarEngine,
 {
-    pub fn create(_: bool) -> GPUResult<FFTKernel<E>> {
-        Err(GPUError::GPUDisabled)
+    pub fn create() -> GPUResult<FFTKernel<E>> {
+        return Err(GPUError::GPUDisabled);
     }
 
     pub fn radix_fft(&mut self, _: &mut [E::Fr], _: &E::Fr, _: u32) -> GPUResult<()> {
@@ -32,8 +32,8 @@ impl<E> MultiexpKernel<E>
 where
     E: ScalarEngine,
 {
-    pub fn create(_: bool) -> GPUResult<MultiexpKernel<E>> {
-        Err(GPUError::GPUDisabled)
+    pub fn create() -> GPUResult<MultiexpKernel<E>> {
+        return Err(GPUError::GPUDisabled);
     }
 
     pub fn multiexp<G>(
@@ -62,7 +62,7 @@ macro_rules! locked_kernel {
         where
             E: Engine,
         {
-            pub fn new(_: usize, _: bool) -> $class<E> {
+            pub fn new(_: usize) -> $class<E> {
                 $class::<E>(PhantomData)
             }
 
