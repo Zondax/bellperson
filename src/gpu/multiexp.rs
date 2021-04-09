@@ -12,7 +12,7 @@ use rust_gpu_tools::*;
 use std::any::TypeId;
 use std::sync::Arc;
 
-use scheduler_client::{ResourceAlloc, ResourceMemory, ResourceType};
+use scheduler_client::{get_device_by_id, ResourceAlloc, ResourceMemory, ResourceType};
 
 const MAX_WINDOW_SIZE: usize = 10;
 const LOCAL_WORK_SIZE: usize = 256;
@@ -220,8 +220,6 @@ where
     E: Engine,
 {
     pub fn create(alloc: Option<&ResourceAlloc>) -> GPUResult<MultiexpKernel<E>> {
-        let devices = opencl::Device::all();
-
         let kernels = if let Some(alloc) = alloc {
             if alloc.resource_id.is_empty() {
                 return Err(GPUError::Simple("No working GPUs found!"));
@@ -231,11 +229,17 @@ where
                 _ => None,
             };
 
-            devices
-                .into_iter()
-                .enumerate()
-                .filter(|(i, _)| alloc.resource_id.iter().any(|id| *id == *i))
-                .map(|(_, d)| (d, SingleMultiexpKernel::<E>::create(d.clone(), mem)))
+            alloc
+                .resource_id
+                .iter()
+                .filter_map(|id| {
+                    if let Some(dev) = get_device_by_id(*id) {
+                        Some(dev.get_inner())
+                    } else {
+                        None
+                    }
+                })
+                .map(|d| (d.clone(), SingleMultiexpKernel::<E>::create(d.clone(), mem)))
                 .filter_map(|(device, res)| {
                     if let Err(ref e) = res {
                         error!(
@@ -248,6 +252,7 @@ where
                 })
                 .collect::<Vec<_>>()
         } else {
+            let devices = opencl::Device::all();
             devices
                 .into_iter()
                 .map(|d| (d, SingleMultiexpKernel::<E>::create(d.clone(), None)))

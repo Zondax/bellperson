@@ -8,7 +8,7 @@ use log::info;
 use rust_gpu_tools::*;
 use std::cmp;
 
-use scheduler_client::ResourceAlloc;
+use scheduler_client::{get_device_by_id, ResourceAlloc};
 
 const LOG2_MAX_ELEMENTS: usize = 32; // At most 2^32 elements is supported.
 const MAX_LOG2_RADIX: u32 = 8; // Radix256
@@ -28,20 +28,28 @@ where
     E: Engine,
 {
     pub fn create(alloc: Option<&ResourceAlloc>) -> GPUResult<FFTKernel<E>> {
-        let devices = opencl::Device::all();
-
         let device = if let Some(alloc) = alloc {
             if alloc.resource_id.is_empty() {
                 return Err(GPUError::Simple("No working GPUs found!"));
             }
-            devices
-                .into_iter()
-                .enumerate()
-                .find(|(i, _)| *i == alloc.resource_id[0])
-                .map(|(_, d)| d.clone())
-                .ok_or(GPUError::Simple("No working GPUs found!"))?
+            let devs = alloc
+                .resource_id
+                .iter()
+                .filter_map(|id| {
+                    if let Some(dev) = get_device_by_id(*id) {
+                        Some(dev.get_inner())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            if devs.is_empty() {
+                return Err(GPUError::Simple("No GPUs found!"));
+            }
+            devs[0].clone()
         } else {
             // Select the first device for FFT
+            let devices = opencl::Device::all();
             devices[0].clone()
         };
 
