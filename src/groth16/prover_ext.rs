@@ -48,10 +48,7 @@ macro_rules! solver {
                 let mut rng = rand::thread_rng();
                 // get the scheduler client
                 let id = rng.gen::<u32>();
-                let client = match register(id, id as _) {
-                    Ok(c) => c,
-                    Err(e) => return Err(e.into()),
-                };
+                let client = register::<SynthesisError>(id, id as _)?; //.map_err(|e| SynthesisError::from(e))?;
 
                 if let Some(ref mut req) = task_req {
                     if self.num_iter == 1 {
@@ -61,7 +58,7 @@ macro_rules! solver {
                     }
                 }
 
-                schedule_one_of(client, self, task_req, Duration::from_secs(90))
+                schedule_one_of(client, self, task_req, Duration::from_secs(190))
                     .map_err(|e| e.into())
             }
         }

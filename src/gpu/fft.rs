@@ -8,7 +8,7 @@ use log::info;
 use rust_gpu_tools::*;
 use std::cmp;
 
-use scheduler_client::{get_device_by_id, ResourceAlloc};
+use scheduler_client::{get_device_by_hash, ResourceAlloc};
 
 const LOG2_MAX_ELEMENTS: usize = 32; // At most 2^32 elements is supported.
 const MAX_LOG2_RADIX: u32 = 8; // Radix256
@@ -36,7 +36,7 @@ where
                 .resource_id
                 .iter()
                 .filter_map(|id| {
-                    if let Some(dev) = get_device_by_id(*id) {
+                    if let Some(dev) = get_device_by_hash(*id) {
                         Some(dev.get_inner())
                     } else {
                         None

@@ -23,7 +23,9 @@ use crate::{
 use chrono;
 
 use log::info;
-use scheduler_client::{resources_as_requirements, Deadline, TaskReqBuilder};
+use scheduler_client::{
+    resources_as_requirements, Deadline, ResourceMemory, ResourceType, TaskReqBuilder,
+};
 
 use super::{FftSolver, MultiexpSolver};
 
@@ -348,7 +350,8 @@ where
         let mut task_req = TaskReqBuilder::new()
             .with_time_estimations(Duration::from_millis(500), 0, Duration::from_millis(3000))
             .with_deadline(deadline);
-        for req in resource_req.into_iter() {
+        for mut req in resource_req.into_iter() {
+            req.resource = ResourceType::Gpu(ResourceMemory::All);
             task_req = task_req.resource_req(req);
         }
         Some(task_req.build())
@@ -619,6 +622,7 @@ where
 
     let proof_time = start.elapsed();
     info!("prover time: {:?}", proof_time);
+    println!("prover time: {:?}", proof_time);
 
     Ok(proofs)
 }

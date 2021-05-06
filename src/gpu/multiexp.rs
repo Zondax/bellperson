@@ -12,7 +12,7 @@ use rust_gpu_tools::*;
 use std::any::TypeId;
 use std::sync::Arc;
 
-use scheduler_client::{get_device_by_id, ResourceAlloc, ResourceMemory, ResourceType};
+use scheduler_client::{get_device_by_hash, ResourceAlloc, ResourceMemory, ResourceType};
 
 const MAX_WINDOW_SIZE: usize = 10;
 const LOCAL_WORK_SIZE: usize = 256;
@@ -233,7 +233,7 @@ where
                 .resource_id
                 .iter()
                 .filter_map(|id| {
-                    if let Some(dev) = get_device_by_id(*id) {
+                    if let Some(dev) = get_device_by_hash(*id) {
                         Some(dev.get_inner())
                     } else {
                         None
