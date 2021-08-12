@@ -22,7 +22,7 @@ use scheduler_client::{
 const TIMEOUT: u64 = 1200;
 
 macro_rules! solver {
-    ($class:ident, $kern:ident, $num_gpu: expr) => {
+    ($class:ident, $kern:ident, $limit_num_gpu_to: expr) => {
         pub struct $class<E, F, R>
         where
             for<'a> F: FnMut(usize, &'a mut Option<$kern<E>>) -> Option<Result<R, SynthesisError>>,
@@ -68,11 +68,11 @@ macro_rules! solver {
                 let task_type = task_type.map(|t| match t {
                     BellTaskType::WinningPost => TaskType::WinningPost,
                     BellTaskType::WindowPost => TaskType::WindowPost,
-                    _ => TaskType::MerkleProof,
+                    _ => TaskType::MerkleTree,
                 });
 
                 // FFT Kernels use only one GPU.
-                let quantity = if let Some(num_gpus) = $num_gpu {
+                let quantity = if let Some(num_gpus) = $limit_num_gpu_to {
                     num_gpus
                 } else {
                     // MULTIEXP Kernels use all the GPUs in the system
@@ -87,9 +87,8 @@ macro_rules! solver {
                         preemptible: true,
                     };
                     let task_req = TaskReqBuilder::new()
-                        .with_task_type(TaskType::MerkleProof)
                         .resource_req(resouce_req)
-                        .with_task_type(task_type.unwrap_or(TaskType::MerkleProof));
+                        .with_task_type(task_type.unwrap_or(TaskType::MerkleTree));
                     task_req.build()
                 };
 
