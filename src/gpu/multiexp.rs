@@ -304,28 +304,28 @@ where
 
         let mut acc = <G as CurveAffine>::Projective::zero();
 
-        let results = crate::multicore::RAYON_THREAD_POOL.install(|| {
-            if n > 0 {
-                bases
+        let results = if n > 0 {
+            bases
                 .par_chunks(chunk_size)
                 .zip(exps.par_chunks(chunk_size))
                 .zip(self.kernels.par_iter_mut())
-                .map(|((bases, exps), kern)| -> Result<<G as CurveAffine>::Projective, GPUError> {
-                    let mut acc = <G as CurveAffine>::Projective::zero();
-                    for (bases, exps) in bases.chunks(kern.n).zip(exps.chunks(kern.n)) {
-                        match kern.multiexp(bases, exps, bases.len()) {
-                            Ok(result) => acc.add_assign(&result),
-                            Err(e) => return Err(e),
+                .map(
+                    |((bases, exps), kern)| -> Result<<G as CurveAffine>::Projective, GPUError> {
+                        let mut acc = <G as CurveAffine>::Projective::zero();
+                        for (bases, exps) in bases.chunks(kern.n).zip(exps.chunks(kern.n)) {
+                            match kern.multiexp(bases, exps, bases.len()) {
+                                Ok(result) => acc.add_assign(&result),
+                                Err(e) => return Err(e),
+                            }
                         }
-                    }
 
-                    Ok(acc)
-                })
+                        Ok(acc)
+                    },
+                )
                 .collect::<Vec<_>>()
-            } else {
-                Vec::new()
-            }
-        });
+        } else {
+            Vec::new()
+        };
 
         let cpu_acc = cpu_multiexp(
             &pool,
